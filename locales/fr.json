@@ -1,0 +1,9 @@
+{
+    "zone" : {
+        "enter" : "Vous êtes entré dans une zone sociale !",
+        "leave" : "Vous avez quitté la zone sociale.",
+        "not_in" : "Vous n'êtes pas dans une zone sociale !",
+        "wait_for_payment" : "Vous devez attendre %s minutes avant d'être payé à nouveau !",
+        "paid" : "Vous avez reçu %s $ pour votre présence dans une zone sociale"
+    }
+}

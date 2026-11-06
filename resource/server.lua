@@ -1,8 +1,11 @@
 lib.locale()
 local config = require('config')
+lib.versionCheck('s4t4n667/s4t4n667_socialzones')
 
+local defaultPayPeriod = config.defaultPayPeriod
+local defaultMoneyType = config.defaultMoneyType
+local allowedMoneyTypes = { money = true, black_money = true }
 local lastPayment = {}
-local cooldown = config.payPeriod * 60
 
 local function isPlayerInZone(x, y, points)
     local inside = false
@@ -19,34 +22,64 @@ local function isPlayerInZone(x, y, points)
     return inside
 end
 
-RegisterNetEvent('s4t4n667_socialzones:payPlayer', function()
+local function getPlayerMetadata(src)
+    if GetResourceState('qbx_core') == 'started' then
+        local player = exports.qbx_core:GetPlayer(src)
+        return player and player.PlayerData.metadata
+    elseif GetResourceState('qb-core') == 'started' then
+        local player = exports['qb-core']:GetCoreObject().Functions.GetPlayer(src)
+        return player and player.PlayerData.metadata
+    end
+end
+
+local function isPlayerDead(src)
+    local state = Player(src).state
+    if state.isDead or state.dead then return true end
+
+    local metadata = getPlayerMetadata(src)
+    if metadata and (metadata.isdead or metadata.inlaststand) then return true end
+
+    return GetEntityHealth(GetPlayerPed(src)) <= 0
+end
+
+RegisterNetEvent('s4t4n667_socialzones:payPlayer', function(zoneIndex)
     local src = source
     local currentTime = os.time()
 
-    if lastPayment[src] and (currentTime - lastPayment[src]) < cooldown then
-        TriggerClientEvent('ox_lib:notify', src, {type = 'error', description = string.format(locale('zone.wait_for_payment'), config.payPeriod), duration = 5000})
+    if not config.payWhenDead and isPlayerDead(src) then return end
+
+    local currentZone = type(zoneIndex) == 'number' and config.socialZones[zoneIndex]
+    local coords = GetEntityCoords(GetPlayerPed(src))
+
+    if not currentZone
+        or coords.z < currentZone.minZ or coords.z > currentZone.maxZ
+        or not isPlayerInZone(coords.x, coords.y, currentZone.points) then
+        TriggerClientEvent('ox_lib:notify', src, {type = 'error', description = locale('zone.not_in'), duration = 5000, position = config.notifications.position})
         return
     end
 
-    local ped = GetPlayerPed(src)
-    local coords = GetEntityCoords(ped)
-    local payAmount = nil
+    local payPeriod = currentZone.payPeriod or defaultPayPeriod
 
-    for _, zone in pairs(config.socialZones) do
-        if coords.z >= zone.minZ and coords.z <= zone.maxZ then
-            if isPlayerInZone(coords.x, coords.y, zone.points) then
-                payAmount = zone.payAmount
-                break
-            end
-        end
-    end
-
-    if not payAmount then
-            TriggerClientEvent('ox_lib:notify', src, {type = 'error', description = locale('zone.not_in'), duration = 5000})
+    if lastPayment[src] and (currentTime - lastPayment[src]) < payPeriod * 60 then
+        TriggerClientEvent('ox_lib:notify', src, {type = 'error', description = string.format(locale('zone.wait_for_payment'), payPeriod), duration = 5000, position = config.notifications.position})
         return
     end
 
-    exports.ox_inventory:AddItem(src, 'money', payAmount)
+    if not exports.ox_inventory:AddItem(src, allowedMoneyTypes[currentZone.moneyType] and currentZone.moneyType or defaultMoneyType, currentZone.payAmount) then return end
 
     lastPayment[src] = currentTime
+
+    if currentZone.payNotify == false then return end
+
+    TriggerClientEvent('ox_lib:notify', src, {
+        title = currentZone.name,
+        description = string.format(locale('zone.paid'), currentZone.payAmount),
+        icon = (currentZone.icon and currentZone.icon ~= '') and currentZone.icon or 'money-bill',
+        iconColor = (currentZone.iconColor and currentZone.iconColor ~= '') and currentZone.iconColor or '#51A231',
+        position = config.notifications.position,
+    })
+end)
+
+AddEventHandler('playerDropped', function()
+    lastPayment[source] = nil
 end)

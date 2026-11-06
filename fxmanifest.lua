@@ -5,7 +5,7 @@ lua54 'yes'
 
 author 'Asgaard Developments | s4t4n667'
 description 'Zone-based social payment script'
-version '1.0.0'
+version '2.0.0'
 
 shared_scripts {
     '@ox_lib/init.lua',
@@ -13,8 +13,7 @@ shared_scripts {
 }
 
 client_scripts {
-    'resource/client.lua',
-    '@PolyZone/client.lua'
+    'resource/client.lua'
 }
 
 server_scripts {
